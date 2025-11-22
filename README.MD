@@ -28,7 +28,7 @@ pip install -r requirements.txt
 3. Run the app (example):
 
 ```bash
-python main.py
+fastapi dev main.py
 ```
 
 Open `http://localhost:8000` (or the address printed by the server) to interact with the API.
