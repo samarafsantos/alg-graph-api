@@ -2,6 +2,15 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import duckdb
 
+
+from graph_logic import load_graph_data, get_graph_markers
+
+# Variáveis de Configuração
+PATH_DATABASE = "./maritime_db.duckdb"
+ID_RODADA_ALVO = "2025111700"
+HORIZONTE_ALVO = 0
+NODE_LIMIT = 1000
+
 app = FastAPI()
 
 origins = [
@@ -16,14 +25,18 @@ app.add_middleware(
     allow_headers=["*"], 
 )
 
+# --- Evento de Inicialização ---
+# (aparentemente deprecado)
+@app.on_event("startup")
+async def startup_event():
+    try:
+        load_graph_data(PATH_DATABASE, ID_RODADA_ALVO, HORIZONTE_ALVO, NODE_LIMIT)
+    except Exception as e:
+        print(f"Erro ao carregar o grafo: {e}")
+
 @app.get("/")
 async def root():
     return {"message": "Hello World"}
-
-PATH_DATABASE = "./maritime_db.duckdb"
-
-ID_RODADA_ALVO = "2025111700"
-HORIZONTE_ALVO = 0
 
 @app.get("/markers")
 def get_markers(limit: int = 10):
@@ -31,37 +44,7 @@ def get_markers(limit: int = 10):
     Retorna 'limit' marcadores contendo lat, lon, hs.
     """
 
-    con = duckdb.connect(PATH_DATABASE, read_only=True)
-
-    # granularity controla o espaçamento dos pontos:
-    # quanto maior o valor, maior o bloco espacial (menos pontos no retorno).
-    # Ex.: granularity=10 → blocos de ~0.1° (~11 km)
-    #     granularity=20 → blocos de ~0.05° (~5 km)
-    granularity = 10 
-
-    query = f"""
-        SELECT 
-            AVG(latitude) AS latitude,
-            AVG(longitude) AS longitude,
-            AVG(hs_metro) AS hs
-        FROM DADOS_GRADE
-        WHERE id_rodada = '{ID_RODADA_ALVO}'
-        AND horizonte_horas = {HORIZONTE_ALVO}
-
-        GROUP BY 
-            FLOOR(latitude * {granularity}),
-            FLOOR(longitude * {granularity})
-
-        LIMIT {limit}
-    """
-
-    results = con.execute(query).fetchall()
-    con.close()
-
-    markers = [
-        {"lat": lat, "lon": lon, "hs": hs}
-        for (lat, lon, hs) in results
-    ]
+    markers = get_graph_markers(limit)
 
     return {"count": len(markers), "items": markers}
 
