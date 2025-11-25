@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 import duckdb
 
 
@@ -11,7 +12,21 @@ ID_RODADA_ALVO = "2025111700"
 HORIZONTE_ALVO = 0
 NODE_LIMIT = 1000
 
-app = FastAPI()
+# Gerenciador de Ciclo de Vida
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 1. O que acontece ANTES da API começar (Startup)
+    try:
+        load_graph_data(PATH_DATABASE, ID_RODADA_ALVO, HORIZONTE_ALVO, NODE_LIMIT)
+    except Exception as e:
+        print(f"Erro ao carregar o grafo: {e}")
+    
+    yield  # O FastAPI funciona aqui enquanto o servidor está ligado
+    
+    # 2. O que acontece DEPOIS da API desligar (Shutdown)
+    print("A desligar API...")
+
+app = FastAPI(lifespan=lifespan)
 
 origins = [
     "*",
@@ -24,15 +39,6 @@ app.add_middleware(
     allow_methods=["*"], 
     allow_headers=["*"], 
 )
-
-# --- Evento de Inicialização ---
-# (aparentemente deprecado)
-@app.on_event("startup")
-async def startup_event():
-    try:
-        load_graph_data(PATH_DATABASE, ID_RODADA_ALVO, HORIZONTE_ALVO, NODE_LIMIT)
-    except Exception as e:
-        print(f"Erro ao carregar o grafo: {e}")
 
 @app.get("/")
 async def root():
