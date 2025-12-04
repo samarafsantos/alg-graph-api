@@ -29,6 +29,10 @@ pip install -r requirements.txt
 
 ```bash
 fastapi dev main.py
+
+or
+
+uvicorn main:app --reload
 ```
 
 Open `http://localhost:8000` (or the address printed by the server) to interact with the API.
